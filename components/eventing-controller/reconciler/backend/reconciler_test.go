@@ -321,6 +321,7 @@ var _ = Describe("Backend Reconciliation Tests", func() {
 			natsCommander.startErr = errors.New("I don't want to start")
 			By("Un-label the BEB secret to switch to NATS")
 			bebSecret := reconcilertesting.WithBEBMessagingSecret(bebSecret1name, kymaSystemNamespace)
+			bebSecret.Labels = map[string]string{}
 			Expect(k8sClient.Update(ctx, bebSecret)).Should(BeNil())
 			By("Checking EventingReady status is set to false")
 			Eventually(eventingBackendStatusGetter(ctx, eventingBackendName, kymaSystemNamespace), timeout, pollingInterval).
@@ -371,9 +372,44 @@ var _ = Describe("Backend Reconciliation Tests", func() {
 		})
 	})
 
-	PWhen("Switching to BEB and then stopping NATS controller fails", func() {
+	When("Switching to BEB and then stopping NATS controller fails", func() {
 		It("Should mark Eventing Backend CR to not ready", func() {
-			// TODO:
+			ctx := context.Background()
+			natsCommander.stopErr = errors.New("I shan't stop")
+			By("Label the secret to switch to BEB")
+			bebSecret := reconcilertesting.WithBEBMessagingSecret(bebSecret1name, kymaSystemNamespace)
+			bebSecret.Labels = map[string]string{
+				BEBBackendSecretLabelKey: BEBBackendSecretLabelValue,
+			}
+			Expect(k8sClient.Update(ctx, bebSecret)).Should(BeNil())
+			By("Checking EventingReady status is set to false")
+			Eventually(eventingBackendStatusGetter(ctx, eventingBackendName, kymaSystemNamespace), timeout, pollingInterval).
+				Should(Equal(&eventingv1alpha1.EventingBackendStatus{
+					Backend:                     eventingv1alpha1.BebBackendType,
+					EventingReady:               utils.BoolPtr(false),
+					SubscriptionControllerReady: utils.BoolPtr(false),
+					PublisherProxyReady:         utils.BoolPtr(false),
+					BebSecretName:               "",
+					BebSecretNamespace:          "",
+				}))
+			By("Checking that no BEB secret is created for publisher")
+			getPublisherProxySecret(ctx).Should(BeNil())
+		})
+	})
+
+	When("Eventually stopping NATS controller succeeds", func() {
+		It("Should mark Eventing Backend CR to ready", func() {
+			ctx := context.Background()
+			natsCommander.stopErr = nil
+			Eventually(eventingBackendStatusGetter(ctx, eventingBackendName, kymaSystemNamespace), timeout, pollingInterval).
+				Should(Equal(&eventingv1alpha1.EventingBackendStatus{
+					Backend:                     eventingv1alpha1.BebBackendType,
+					EventingReady:               utils.BoolPtr(true),
+					SubscriptionControllerReady: utils.BoolPtr(true),
+					PublisherProxyReady:         utils.BoolPtr(true),
+					BebSecretName:               bebSecret1name,
+					BebSecretNamespace:          kymaSystemNamespace,
+				}))
 		})
 	})
 })
