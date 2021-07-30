@@ -82,3 +82,7 @@ healthProbe:
     successThreshold: 1
     timeoutSeconds: 2
 
+preUpgradeJob:
+  image:
+    name: mfaizan21/eventing-upgradejob-124
+    tag: "latest"
