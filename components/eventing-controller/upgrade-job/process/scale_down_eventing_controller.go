@@ -25,6 +25,11 @@ func (s ScaleDownEventingController) ToString() string {
 }
 
 func (s ScaleDownEventingController) Do() error {
+	if !s.process.State.isBebEnabled {
+		fmt.Println("BEB not enabled .. skipping")
+		return nil
+	}
+
 	// Get eventing-controller deployment object
 	oldDeployment, err := s.process.Clients.Deployment.Get(s.process.KymaNamespace, s.process.ControllerName)
 	if (err != nil) {

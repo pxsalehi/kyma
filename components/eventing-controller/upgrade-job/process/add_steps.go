@@ -5,5 +5,6 @@ func (p *Process) AddSteps() {
 		NewCheckIsBebEnabled(p),
 		NewScaleDownEventingController(p),
 		NewGetSubscriptions(p),
+		NewDeleteBebSubscriptions(p),
 	}
 }

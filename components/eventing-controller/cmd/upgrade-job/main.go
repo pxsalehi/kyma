@@ -18,9 +18,6 @@ import (
 func main() {
 	// @TODO: create logger instance
 
-
-	fmt.Println("##### Hello world from upgrade-hook main 1.24.xxx")
-
 	// Create k8s client set
 	var kubeconfig *string
 	//if home := homedir.HomeDir(); home != "" {
