@@ -2,6 +2,8 @@ package process
 
 func (p *Process) AddSteps() {
 	p.Steps = []Step{
-		NewScaleDownEventingController(p),
+		NewCheckIsBebEnabled(p),
+		//NewScaleDownEventingController(p),
+		NewGetSubscriptions(p),
 	}
 }

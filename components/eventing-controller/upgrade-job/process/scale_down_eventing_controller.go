@@ -1,7 +1,5 @@
 package process
 
-import "fmt"
-
 var _ Step = &ScaleDownEventingController{}
 
 type ScaleDownEventingController struct {
@@ -21,13 +19,20 @@ func (s ScaleDownEventingController) ToString() string {
 }
 
 func (s ScaleDownEventingController) Do() error {
-
-	deployment, err := s.process.Clients.Deployment.Get("kyma-system", "eventing-controller")
+	// Get eventing-controller deployment object
+	oldDeployment, err := s.process.Clients.Deployment.Get(s.process.KymaNamespace, s.process.ControllerName)
 	if (err != nil) {
 		return err
 	}
 
-	fmt.Println(deployment.Name)
+	// reduce replica count to zero
+	desiredContainer := oldDeployment.DeepCopy()
+	desiredContainer.Spec.Replicas = int32Ptr(1)
+
+	_, err = s.process.Clients.Deployment.Update(s.process.KymaNamespace, desiredContainer)
+	if (err != nil) {
+		return err
+	}
 
 	return nil
 }

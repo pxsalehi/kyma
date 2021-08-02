@@ -27,9 +27,6 @@ rules:
   - apiGroups: ["eventing.kyma-project.io"]
     resources: ["subscriptions"]
     verbs: ["get", "list"]
-  - apiGroups: ["eventing.kyma-project.io"]
-    resources: ["subscriptions"]
-    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

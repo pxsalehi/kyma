@@ -4,9 +4,13 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/deployment"
+	eventingbackend "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/eventing-backend"
+	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/subscription"
 	jobprocess "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/process"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	//ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func main() {
@@ -22,28 +26,41 @@ func main() {
 	//} else {
 	//	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	//}
-	kubeconfig = flag.String("kubeconfig", "$HOME/kubeconfigs/kubeconfig--kymatunas--fzn-d1.yml", "absolute path to the kubeconfig file")
+	kubeconfig = flag.String("kubeconfig", "/Users/faizan/kubeconfigs/kubeconfig--kymatunas--fzn-d1.yml", "absolute path to the kubeconfig file")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
 	}
+
+	// Create typed client
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
+	// Create dynamic client
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
 
 	// setup clients
 	deploymentClient := deployment.NewClient(clientset)
+	subscriptionClient := subscription.NewClient(dynamicClient)
+	eventingbackendClient := eventingbackend.NewClient(dynamicClient)
 
 	// Create process
 	p := jobprocess.Process{
 		ReleaseName:  "TEST RS Name 1.24.x",
 		BEBNamespace: "TEST BEB NS",
+		KymaNamespace: "kyma-system",
+		ControllerName: "eventing-controller",
 		Clients: jobprocess.Clients{
 			Deployment: deploymentClient,
+			Subscription: subscriptionClient,
+			EventingBackend: eventingbackendClient,
 		},
 	}
 

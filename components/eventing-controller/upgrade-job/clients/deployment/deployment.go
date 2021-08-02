@@ -25,10 +25,12 @@ func (c Client) Get(namespace, name string) (*appsv1.Deployment, error) {
 	return deployment, nil
 }
 
-//func (c Client) Patch(namespace, name string, data []byte) (*appsv1.Deployment, error) {
-//	unstructuredDeployment, err := c.DynamicClient.Resource(GroupVersionResource()).Namespace(namespace).Patch(name, types.MergePatchType, data, metav1.PatchOptions{})
-//	if err != nil {
-//		return nil, err
-//	}
-//	return toDeployment(unstructuredDeployment)
-//}
+func (c Client) Update(namespace string, desiredDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	deploymentsClient := c.clientset.AppsV1().Deployments(namespace)
+	result, err := deploymentsClient.Update(context.TODO(), desiredDeployment, metav1.UpdateOptions{})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
