@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"time"
+
 	//ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,6 +55,7 @@ func main() {
 
 	// Create process
 	p := jobprocess.Process{
+		TimeoutPeriod: 60 * time.Second,
 		ReleaseName:  "TEST RS Name 1.24.x",
 		BEBNamespace: "TEST BEB NS",
 		KymaNamespace: "kyma-system",
