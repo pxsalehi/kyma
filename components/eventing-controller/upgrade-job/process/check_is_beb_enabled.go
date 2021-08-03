@@ -21,13 +21,13 @@ func (s CheckIsBebEnabled) ToString() string {
 }
 
 func (s CheckIsBebEnabled) Do() error {
-	eventingbackendObj, err := s.process.Clients.EventingBackend.Get(s.process.KymaNamespace, "eventing-backend")
-	if (err != nil) {
+	eventingbackendObject, err := s.process.Clients.EventingBackend.Get(s.process.KymaNamespace, "eventing-backend")
+	if err != nil {
 		return err
 	}
 
 	s.process.State.IsBebEnabled = false
-	if eventingbackendObj.Status.Backend == eventingv1alpha1.BebBackendType {
+	if eventingbackendObject.Status.Backend == eventingv1alpha1.BebBackendType {
 		s.process.State.IsBebEnabled = true
 	}
 

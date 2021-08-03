@@ -1,7 +1,5 @@
 package process
 
-import "fmt"
-
 var _ Step = &FilterSubscriptions{}
 
 type FilterSubscriptions struct {
@@ -22,7 +20,7 @@ func (s FilterSubscriptions) ToString() string {
 
 func (s FilterSubscriptions) Do() error {
 	if !s.process.State.IsBebEnabled {
-		fmt.Println("BEB not enabled .. skipping")
+		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
 		return nil
 	}
 

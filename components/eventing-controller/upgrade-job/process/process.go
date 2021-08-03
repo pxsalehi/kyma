@@ -1,6 +1,9 @@
 package process
 
-import "time"
+import (
+	"github.com/kyma-project/kyma/common/logging/logger"
+	"time"
+)
 
 type Process struct {
 	Steps           []Step
@@ -11,4 +14,5 @@ type Process struct {
 	Clients         Clients
 	State           State
 	TimeoutPeriod time.Duration
+	Logger *logger.Logger
 }

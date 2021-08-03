@@ -1,7 +1,6 @@
 package process
 
 import (
-	"fmt"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -25,7 +24,7 @@ func (s DeletePublisherDeployment) ToString() string {
 
 func (s DeletePublisherDeployment) Do() error {
 	if !s.process.State.IsBebEnabled {
-		fmt.Println("BEB not enabled .. skipping")
+		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
 		return nil
 	}
 

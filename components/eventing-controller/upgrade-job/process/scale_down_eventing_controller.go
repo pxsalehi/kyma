@@ -1,7 +1,6 @@
 package process
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"time"
 )
@@ -26,13 +25,13 @@ func (s ScaleDownEventingController) ToString() string {
 
 func (s ScaleDownEventingController) Do() error {
 	if !s.process.State.IsBebEnabled {
-		fmt.Println("BEB not enabled .. skipping")
+		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
 		return nil
 	}
 
 	// Get eventing-controller deployment object
 	oldDeployment, err := s.process.Clients.Deployment.Get(s.process.KymaNamespace, s.process.ControllerName)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
 
@@ -40,7 +39,7 @@ func (s ScaleDownEventingController) Do() error {
 	desiredContainer := oldDeployment.DeepCopy()
 	desiredContainer.Spec.Replicas = int32Ptr(0)
 	_, err = s.process.Clients.Deployment.Update(s.process.KymaNamespace, desiredContainer)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
 
@@ -49,25 +48,26 @@ func (s ScaleDownEventingController) Do() error {
 	isScaledDownSuccess := false
 	start := time.Now()
 	for time.Since(start) < s.process.TimeoutPeriod {
-		fmt.Println("Checking status")
+		s.process.Logger.WithContext().Debug("Checking replica count of eventing-controller...")
 
 		time.Sleep(1 * time.Second)
 
 		controllerDeployment, err := s.process.Clients.Deployment.Get(s.process.KymaNamespace, s.process.ControllerName)
 		if err != nil {
-			// @TODO: print error or someting
+			s.process.Logger.WithContext().Error(err)
+			// @TODO: should we stop or continue
 			continue
 		}
 
 		if controllerDeployment.Status.Replicas == 0 {
-			fmt.Println("Controller down success!!!")
+			s.process.Logger.WithContext().Info("Eventing Controller scaled down to zero!")
 			isScaledDownSuccess = true
 			break
 		}
 	}
 
 	if !isScaledDownSuccess {
-		return errors.New("Timeout! Failed to scale down eventing controller")
+		return errors.New("Timeout! Failed to scale down eventing-controller")
 	}
 
 	return nil

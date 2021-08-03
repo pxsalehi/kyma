@@ -1,0 +1,5 @@
+KUBECONFIG=/Users/faizan/kubeconfigs/kubeconfig--kymatunas--fzn-d1.yml
+RELEASE=1-24-x-test
+KYMA_NAMESPACE=kyma-system
+EVENTING_CONTROLLER_NAME=eventing-controller
+EVENTING_PUBLISHER_NAME=eventing-publisher-proxy

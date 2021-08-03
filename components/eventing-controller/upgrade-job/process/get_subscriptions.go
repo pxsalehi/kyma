@@ -1,7 +1,6 @@
 package process
 
 import (
-	"fmt"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -25,20 +24,17 @@ func (s GetSubscriptions) ToString() string {
 
 func (s GetSubscriptions) Do() error {
 	if !s.process.State.IsBebEnabled {
-		fmt.Println("BEB not enabled .. skipping")
+		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
 		return nil
 	}
 
 	namespace := corev1.NamespaceAll
 
 	subscriptionList, err := s.process.Clients.Subscription.List(namespace)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
 
-	fmt.Println(len(subscriptionList.Items))
-
 	s.process.State.Subscriptions = subscriptionList
-
 	return nil
 }

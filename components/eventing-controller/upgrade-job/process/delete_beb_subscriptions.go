@@ -2,7 +2,6 @@ package process
 
 import (
 	"errors"
-	"fmt"
 	"github.com/kyma-project/kyma/components/eventing-controller/reconciler/backend"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -16,7 +15,7 @@ type DeleteBebSubscriptions struct {
 
 func NewDeleteBebSubscriptions(p *Process) DeleteBebSubscriptions {
 	return DeleteBebSubscriptions{
-		name:    "Get list of subscriptions",
+		name:    "Delete BEB subscriptions from Event-Mesh",
 		process: p,
 	}
 }
@@ -27,7 +26,7 @@ func (s DeleteBebSubscriptions) ToString() string {
 
 func (s DeleteBebSubscriptions) Do() error {
 	if !s.process.State.IsBebEnabled {
-		fmt.Println("BEB not enabled .. skipping")
+		s.process.Logger.WithContext().Info("BEB not enabled .. skipping...")
 		return nil
 	}
 
@@ -54,14 +53,14 @@ func (s DeleteBebSubscriptions) Do() error {
 	subscriptionListItems := s.process.State.FilteredSubscriptions.Items
 
 	for _, subscription := range subscriptionListItems {
-		fmt.Println("Deleting: ", subscription.Name)
+		s.process.Logger.WithContext().Info("Deleting: ", subscription.Name)
 		result, err := s.process.Clients.EventMesh.Delete(subscription.Name)
 		if err != nil {
-			fmt.Println(err)
+			s.process.Logger.WithContext().Error(err)
 			continue
 		}
 
-		fmt.Println(result.StatusCode, result.Message)
+		s.process.Logger.WithContext().Info(result.StatusCode, result.Message)
 
 		// @TODO: should we check for response
 	}
