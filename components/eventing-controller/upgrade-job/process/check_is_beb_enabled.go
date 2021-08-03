@@ -26,9 +26,9 @@ func (s CheckIsBebEnabled) Do() error {
 		return err
 	}
 
-	s.process.State.isBebEnabled = false
+	s.process.State.IsBebEnabled = false
 	if eventingbackendObj.Status.Backend == eventingv1alpha1.BebBackendType {
-		s.process.State.isBebEnabled = true
+		s.process.State.IsBebEnabled = true
 	}
 
 	return nil

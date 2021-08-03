@@ -25,7 +25,7 @@ func (s ScaleDownEventingController) ToString() string {
 }
 
 func (s ScaleDownEventingController) Do() error {
-	if !s.process.State.isBebEnabled {
+	if !s.process.State.IsBebEnabled {
 		fmt.Println("BEB not enabled .. skipping")
 		return nil
 	}
@@ -39,16 +39,14 @@ func (s ScaleDownEventingController) Do() error {
 	// reduce replica count to zero
 	desiredContainer := oldDeployment.DeepCopy()
 	desiredContainer.Spec.Replicas = int32Ptr(0)
-
 	_, err = s.process.Clients.Deployment.Update(s.process.KymaNamespace, desiredContainer)
 	if (err != nil) {
 		return err
 	}
 
-	// @TODO: check if we need to wait
+	// @TODO: Do we need to wait
 	// Wait until pod down
 	isScaledDownSuccess := false
-
 	start := time.Now()
 	for time.Since(start) < s.process.TimeoutPeriod {
 		fmt.Println("Checking status")
