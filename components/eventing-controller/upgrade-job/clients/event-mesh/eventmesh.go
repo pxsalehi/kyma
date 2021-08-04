@@ -3,6 +3,11 @@ package eventmesh
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/deployment"
 	emsclient "github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/api/events/client"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/api/events/config"
@@ -10,9 +15,6 @@ import (
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/auth"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/env"
 	"github.com/kyma-project/kyma/components/eventing-controller/reconciler/backend"
-	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Client struct {
@@ -24,7 +26,6 @@ func NewClient() Client {
 	// client.NewClient(config.GetDefaultConfig(cfg.BebApiUrl), authenticator)
 	return Client{}
 }
-
 
 func (c *Client) Init(secret *v1.Secret) error {
 	// First set beb config

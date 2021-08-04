@@ -1,27 +1,32 @@
 package main
 
 import (
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
-	"github.com/kyma-project/kyma/components/eventing-controller/logger"
-	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/deployment"
-	eventmesh "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/event-mesh"
-	eventingbackend "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/eventing-backend"
-	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/secret"
-	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/subscription"
-	jobprocess "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/process"
 	"github.com/pkg/errors"
+
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"time"
+
+	"github.com/kyma-project/kyma/components/eventing-controller/logger"
+	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/deployment"
+	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/secret"
+	"github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/subscription"
+
+	eventmesh "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/event-mesh"
+	eventingbackend "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/clients/eventing-backend"
+	jobprocess "github.com/kyma-project/kyma/components/eventing-controller/upgrade-job/process"
 )
 
+// Config for env variables
 type Config struct {
-	ReleaseName     string `envconfig:"RELEASE" required:"true"`
-	KymaNamespace    string `envconfig:"KYMA_NAMESPACE" default:"kyma-system"`
-	EventingControllerName string `envconfig:"EVENTING_CONTROLLER_NAME" required:"true"`
-	EventingPublisherName string `envconfig:"EVENTING_PUBLISHER_NAME" required:"true"`
-	LogFormat string `envconfig:"APP_LOG_FORMAT" default:"json"`
-	LogLevel  string `envconfig:"APP_LOG_LEVEL" default:"warn"`
+	ReleaseName     		string `envconfig:"RELEASE" required:"true"`
+	KymaNamespace    		string `envconfig:"KYMA_NAMESPACE" default:"kyma-system"`
+	EventingControllerName  string `envconfig:"EVENTING_CONTROLLER_NAME" required:"true"`
+	EventingPublisherName	string `envconfig:"EVENTING_PUBLISHER_NAME" required:"true"`
+	LogFormat 				string `envconfig:"APP_LOG_FORMAT" default:"json"`
+	LogLevel  				string `envconfig:"APP_LOG_LEVEL" default:"warn"`
 }
 
 func main() {

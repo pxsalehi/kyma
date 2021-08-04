@@ -2,24 +2,26 @@ package deployment
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/dynamic"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 )
 
 type Client struct {
-	dynamicClient dynamic.Interface
+	client dynamic.Interface
 }
 
 func NewClient(client dynamic.Interface) Client {
-	return Client{dynamicClient: client}
+	return Client{client}
 }
 
 func (c Client) Get(namespace, name string) (*appsv1.Deployment, error) {
-	unstructuredDeployment, err := c.dynamicClient.Resource(GroupVersionResource()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	unstructuredDeployment, err := c.client.Resource(GroupVersionResource()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +38,7 @@ func (c Client) Update(namespace string, desiredDeployment *appsv1.Deployment) (
 		Object: data,
 	}
 
-	unstructuredDeployment, err := c.dynamicClient.Resource(GroupVersionResource()).Namespace(namespace).Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
+	unstructuredDeployment, err := c.client.Resource(GroupVersionResource()).Namespace(namespace).Update(context.TODO(), unstructuredObj, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +46,7 @@ func (c Client) Update(namespace string, desiredDeployment *appsv1.Deployment) (
 }
 
 func (c Client) Delete(namespace, name string) error {
-	err := c.dynamicClient.Resource(GroupVersionResource()).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := c.client.Resource(GroupVersionResource()).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
