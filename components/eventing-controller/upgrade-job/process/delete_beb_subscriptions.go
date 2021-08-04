@@ -8,11 +8,13 @@ import (
 
 var _ Step = &DeleteBebSubscriptions{}
 
+// DeleteBebSubscriptions struct implements the interface Step
 type DeleteBebSubscriptions struct {
 	name    string
 	process *Process
 }
 
+// NewDeleteBebSubscriptions returns new instance of NewDeleteBebSubscriptions struct
 func NewDeleteBebSubscriptions(p *Process) DeleteBebSubscriptions {
 	return DeleteBebSubscriptions{
 		name:    "Delete BEB subscriptions from Event-Mesh",
@@ -20,10 +22,12 @@ func NewDeleteBebSubscriptions(p *Process) DeleteBebSubscriptions {
 	}
 }
 
+// ToString returns step name
 func (s DeleteBebSubscriptions) ToString() string {
 	return s.name
 }
 
+// Do deletes the subscriptions from Event Mesh (BEB)
 func (s DeleteBebSubscriptions) Do() error {
 	// First initialize the BEB client
 	// Get BEB configs from beb k8s secret

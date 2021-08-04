@@ -17,6 +17,7 @@ import (
 	"github.com/kyma-project/kyma/components/eventing-controller/reconciler/backend"
 )
 
+// Client struct for Event Mesh client
 type Client struct {
 	client *emsclient.Client
 }

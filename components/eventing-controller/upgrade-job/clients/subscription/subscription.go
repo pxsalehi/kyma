@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// Client struct for Kyma Subscription client
 type Client struct {
 	client dynamic.Interface
 }

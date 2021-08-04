@@ -7,11 +7,13 @@ import (
 
 var _ Step = &ScaleDownEventingController{}
 
+// ScaleDownEventingController struct implements the interface Step
 type ScaleDownEventingController struct {
 	name    string
 	process *Process
 }
 
+// NewScaleDownEventingController returns new instance of NewScaleDownEventingController struct
 func NewScaleDownEventingController(p *Process) ScaleDownEventingController {
 	return ScaleDownEventingController{
 		name:    "Scale down eventing controller to zero replicas",
@@ -19,10 +21,12 @@ func NewScaleDownEventingController(p *Process) ScaleDownEventingController {
 	}
 }
 
+// ToString returns step name
 func (s ScaleDownEventingController) ToString() string {
 	return s.name
 }
 
+// Do scales down eventing-controller deployment to zero replicas
 func (s ScaleDownEventingController) Do() error {
 	// Get eventing-controller deployment object
 	oldDeployment, err := s.process.Clients.Deployment.Get(s.process.KymaNamespace, s.process.ControllerName)

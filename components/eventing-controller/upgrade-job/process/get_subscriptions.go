@@ -6,11 +6,13 @@ import (
 
 var _ Step = &GetSubscriptions{}
 
+// GetSubscriptions struct implements the interface Step
 type GetSubscriptions struct {
 	name    string
 	process *Process
 }
 
+// NewGetSubscriptions returns new instance of NewGetSubscriptions struct
 func NewGetSubscriptions(p *Process) GetSubscriptions {
 	return GetSubscriptions{
 		name:    "Get list of subscriptions",
@@ -18,10 +20,12 @@ func NewGetSubscriptions(p *Process) GetSubscriptions {
 	}
 }
 
+// ToString returns step name
 func (s GetSubscriptions) ToString() string {
 	return s.name
 }
 
+// Do fetches all Kyma subscriptions and saves it to process state
 func (s GetSubscriptions) Do() error {
 	namespace := corev1.NamespaceAll
 

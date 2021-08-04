@@ -6,11 +6,13 @@ import (
 
 var _ Step = &DeletePublisherDeployment{}
 
+// DeletePublisherDeployment struct implements the interface Step
 type DeletePublisherDeployment struct {
 	name    string
 	process *Process
 }
 
+// NewDeletePublisherDeployment returns new instance of NewDeletePublisherDeployment struct
 func NewDeletePublisherDeployment(p *Process) DeletePublisherDeployment {
 	return DeletePublisherDeployment{
 		name:    "Delete eventing publisher deployment",
@@ -18,10 +20,12 @@ func NewDeletePublisherDeployment(p *Process) DeletePublisherDeployment {
 	}
 }
 
+// ToString returns step name
 func (s DeletePublisherDeployment) ToString() string {
 	return s.name
 }
 
+// Do deletes the eventing-publisher deployment
 func (s DeletePublisherDeployment) Do() error {
 	// Get eventing-controller deployment object
 	err := s.process.Clients.Deployment.Delete(s.process.KymaNamespace, s.process.PublisherName)

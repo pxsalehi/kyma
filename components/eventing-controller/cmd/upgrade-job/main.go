@@ -1,11 +1,11 @@
 package main
 
 import (
-	"os"
-	"time"
-
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"log"
+	"os"
+	"time"
 
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -31,22 +31,20 @@ type Config struct {
 }
 
 func main() {
-	// Env vars
+	// Read Env variables
 	cfg := new(Config)
 	if err := envconfig.Process("", cfg); err != nil {
-		//logger.Fatalf("Start handler failed with error: %s", err)
-		panic(err)
+		log.Fatalf("Start handler failed with error: %s", err)
 	}
 
 	// Create logger instance
 	ctrLogger, err := logger.New(cfg.LogFormat, cfg.LogLevel)
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to initialize logger"))
-		//os.Exit(1)
+		log.Fatalf("failed to initialize logger: %s", err)
 	}
 	defer func() {
 		if err := ctrLogger.WithContext().Sync(); err != nil {
-			panic(errors.Wrapf(err, "failed to flush logger"))
+			log.Printf("failed to flush logger:: %s\n", err)
 		}
 	}()
 
@@ -106,5 +104,5 @@ func main() {
 		ctrLogger.Logger.WithContext().Error(err)
 	}
 
-	ctrLogger.Logger.WithContext().Info("Completed upgrade-hook main 1.24.x")
+	ctrLogger.Logger.WithContext().Info("upgrade-job completed")
 }

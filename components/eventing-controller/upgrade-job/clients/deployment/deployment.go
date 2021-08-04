@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// Client struct for deployment client
 type Client struct {
 	client dynamic.Interface
 }
