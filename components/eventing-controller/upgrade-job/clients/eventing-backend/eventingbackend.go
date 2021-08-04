@@ -3,6 +3,7 @@ package eventingbackend
 import (
 	"context"
 	"encoding/json"
+
 	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,17 +12,20 @@ import (
 )
 
 type Client struct {
-	dynamicClient dynamic.Interface
+	client dynamic.Interface
 }
 
+// NewClient creates and returns new client for EventingBackend
 func NewClient(client dynamic.Interface) Client {
-	return Client{dynamicClient: client}
+	return Client{client}
 }
 
+// Get returns the EventingBackend for specified name and namespace.
+// or returns an error if the EventingBackend was not found or other issues
 func (c Client) Get(namespace string, name string) (*eventingv1alpha1.EventingBackend, error) {
 
-	ebUnstructured, err := c.dynamicClient.Resource(GroupVersionResource()).Namespace(namespace).Get(
-		context.TODO(), name, metav1.GetOptions{})
+	ebUnstructured, err := c.client.Resource(GroupVersionResource()).Namespace(namespace).Get(
+		context.Background(), name, metav1.GetOptions{})
 
 	if err != nil {
 		return nil, err
@@ -29,6 +33,7 @@ func (c Client) Get(namespace string, name string) (*eventingv1alpha1.EventingBa
 	return toEventingBackend(ebUnstructured)
 }
 
+// GroupVersionResource return the GVR for EventingBackend k8s resource
 func GroupVersionResource() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Version:  eventingv1alpha1.GroupVersion.Version,
@@ -37,6 +42,7 @@ func GroupVersionResource() schema.GroupVersionResource {
 	}
 }
 
+// toEventingBackend converts unstructured EventingBackend object to typed EventingBackend object
 func toEventingBackend(unstructured *unstructured.Unstructured) (*eventingv1alpha1.EventingBackend, error) {
 	triggerList := new(eventingv1alpha1.EventingBackend)
 	triggerListBytes, err := unstructured.MarshalJSON()

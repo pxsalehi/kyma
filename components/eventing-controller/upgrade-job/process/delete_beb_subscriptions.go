@@ -25,12 +25,8 @@ func (s DeleteBebSubscriptions) ToString() string {
 }
 
 func (s DeleteBebSubscriptions) Do() error {
-	if !s.process.State.IsBebEnabled {
-		s.process.Logger.WithContext().Info("BEB not enabled .. skipping...")
-		return nil
-	}
-
-	// Get BEB k8s secret
+	// First initialize the BEB client
+	// Get BEB configs from beb k8s secret
 	secretLabel := backend.BEBBackendSecretLabelKey + "=" + backend.BEBBackendSecretLabelValue
 	secretList, err := s.process.Clients.Secret.ListByMatchingLabels(corev1.NamespaceAll, secretLabel)
 	if err != nil {

@@ -23,11 +23,6 @@ func (s GetSubscriptions) ToString() string {
 }
 
 func (s GetSubscriptions) Do() error {
-	if !s.process.State.IsBebEnabled {
-		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
-		return nil
-	}
-
 	namespace := corev1.NamespaceAll
 
 	subscriptionList, err := s.process.Clients.Subscription.List(namespace)

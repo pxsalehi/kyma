@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -80,6 +81,22 @@ func main() {
 		},
 	}
 
+	// First check if BEB is enabled for Kyma cluster
+	checkBebJob := jobprocess.NewCheckIsBebEnabled(&p)
+	err = checkBebJob.Do()
+	if err != nil {
+		ctrLogger.Logger.WithContext().Error(errors.Wrapf(err, "failed to check: %s", checkBebJob.ToString()))
+		os.Exit(1)
+	}
+
+	// If BEB is not enabled then stop the upgrade-job
+	// because we don't need this upgrade-job
+	if !p.State.IsBebEnabled {
+		ctrLogger.Logger.WithContext().Info("BEB not enabled for Kyma cluster! Exiting upgrade-job")
+		return
+	}
+
+	// BEB is enabled, execute the steps for this upgrade-job
 	// Add steps to process
 	p.AddSteps()
 

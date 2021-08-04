@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"encoding/json"
+
 	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,17 +12,20 @@ import (
 )
 
 type Client struct {
-	dynamicClient dynamic.Interface
+	client dynamic.Interface
 }
 
+// NewClient creates and returns new client for Kyma Subscriptions
 func NewClient(client dynamic.Interface) Client {
-	return Client{dynamicClient: client}
+	return Client{client}
 }
 
+// List returns the list of kyma subscriptions in specified namespace
+// or returns an error if it fails for any reason
 func (c Client) List(namespace string) (*eventingv1alpha1.SubscriptionList, error) {
 
-	subscriptionsUnstructured, err := c.dynamicClient.Resource(GroupVersionResource()).Namespace(namespace).List(
-		context.TODO(), metav1.ListOptions{})
+	subscriptionsUnstructured, err := c.client.Resource(GroupVersionResource()).Namespace(namespace).List(
+		context.Background(), metav1.ListOptions{})
 
 	if err != nil {
 		return nil, err
@@ -29,6 +33,7 @@ func (c Client) List(namespace string) (*eventingv1alpha1.SubscriptionList, erro
 	return toSubscriptionList(subscriptionsUnstructured)
 }
 
+// GroupVersionResource returns the GVR for Subscription resource
 func GroupVersionResource() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Version:  eventingv1alpha1.GroupVersion.Version,
@@ -37,6 +42,7 @@ func GroupVersionResource() schema.GroupVersionResource {
 	}
 }
 
+// toSecretList converts unstructured Subscription list object to typed object
 func toSubscriptionList(unstructuredList *unstructured.UnstructuredList) (*eventingv1alpha1.SubscriptionList, error) {
 	triggerList := new(eventingv1alpha1.SubscriptionList)
 	triggerListBytes, err := unstructuredList.MarshalJSON()

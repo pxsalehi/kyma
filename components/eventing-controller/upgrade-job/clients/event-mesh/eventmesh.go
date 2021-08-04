@@ -21,12 +21,15 @@ type Client struct {
 	client *emsclient.Client
 }
 
+// NewClient creates and returns new client for EventMesh (BEB)
 func NewClient() Client {
 	//authenticator := auth.NewAuthenticator(cfg)
 	// client.NewClient(config.GetDefaultConfig(cfg.BebApiUrl), authenticator)
 	return Client{}
 }
 
+// Init initializes the client by parsing the provided BEB secret
+// It needs to be called once before the client can be used for further operations.
 func (c *Client) Init(secret *v1.Secret) error {
 	// First set beb config
 	cfg := env.Config{}
@@ -43,11 +46,15 @@ func (c *Client) Init(secret *v1.Secret) error {
 	return nil
 }
 
+// Delete deletes the specified subcription from Event Mesh (BEB).
+// It returns DeleteResponse, nil if the request was successful.
+// The DeleteResponse object contains the information if the deletion was successful or not
+// or returns an error if it fails to send the request
 func (c *Client) Delete(bebSubscriptionName string) (*types.DeleteResponse, error) {
 	return c.client.Delete(bebSubscriptionName)
 }
 
-
+// processSecret private method to process BEB secret
 func (c *Client) processSecret(cfg *env.Config, bebSecret *v1.Secret) error {
 	// First parse/decode the bebsecret
 	secret, err := c.getParsedSecret(bebSecret)
@@ -83,6 +90,7 @@ func (c *Client) processSecret(cfg *env.Config, bebSecret *v1.Secret) error {
 	return nil
 }
 
+// getParsedSecret private method to parse/decode BEB secret
 func (c *Client) getParsedSecret(bebSecret *v1.Secret) (*v1.Secret, error) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -133,6 +141,7 @@ func (c *Client) getParsedSecret(bebSecret *v1.Secret) (*v1.Secret, error) {
 	return secret, nil
 }
 
+// getSecretStringData creates Map object for provided data
 func (c *Client) getSecretStringData(clientID, clientSecret, tokenEndpoint, grantType, publishURL, namespace string) map[string]string {
 	return map[string]string{
 		deployment.PublisherSecretClientIDKey:      clientID,

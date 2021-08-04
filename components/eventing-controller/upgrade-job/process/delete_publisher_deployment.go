@@ -23,11 +23,6 @@ func (s DeletePublisherDeployment) ToString() string {
 }
 
 func (s DeletePublisherDeployment) Do() error {
-	if !s.process.State.IsBebEnabled {
-		s.process.Logger.WithContext().Info("BEB not enabled .. skipping")
-		return nil
-	}
-
 	// Get eventing-controller deployment object
 	err := s.process.Clients.Deployment.Delete(s.process.KymaNamespace, s.process.PublisherName)
 	// Ignore the error if its 404 error
