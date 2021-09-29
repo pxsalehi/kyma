@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -188,7 +189,7 @@ func (c *benchCmd) bench(_ *kingpin.ParseContext) error {
 
 		// create the stream with our attributes, will create it if it doesn't exist or make sure the existing one has the same attributes
 		_, err = js.AddStream(&nats.StreamConfig{Name: c.streamName, Subjects: []string{c.subject}, Retention: nats.LimitsPolicy, Storage: storageType, Replicas: c.replicas})
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "name already in use"){
 			log.Fatalf("there is already a stream %s defined with conflicting attributes, if you want to delete and re-define the stream use `nats stream delete` (%v)", c.streamName, err)
 		}
 
