@@ -15,10 +15,17 @@ have at-least-once guarantees?
   
 - [P] What are the options for encryption when using file-based streams?
   
-- [P] Benchmark/estimate following using 1 stream for all and 1 stream per `app.*.*.*` and a memory- and file-based cluster:
-  + Storage size requirement
-  + Performance of publishing and subscribing in terms of throughput and latency
-  + Cluster stability in the long run
+- [P] Benchmark/estimate:
+  + Possible variations are:
+    + One stream for all and 1 stream per `app.*.*.*`
+    + Memory- and file-based streams
+    + Replication (cluster size 1 or 3)
+    + Encryption
+  + Metrics
+    + Storage size requirement
+    + Performance of publishing and subscribing in terms of throughput and latency
+    + Cluster stability in the long run
+    
 
 ### Phase 2
 
@@ -35,7 +42,8 @@ When moving to JetStream, what extra features/options can we provide as part of 
 ## Notes
 
 What is a stream and how many do we need? A stream is a collection of subjects, and has its own configs such 
-as: storage, replicas, retention, deduplication.
+as: storage, replicas, retention, deduplication. Each subject can only be in one stream. Therefore, different stream
+configs can be set either for one stream which is used by all topics `>`, or for all topics of the same application `app.>`.
 
 **Configuring a JetStream cluster**
 - The replica count must be less than the maximum number of servers(!?) -> Do we need 4 servers for 3 replicas?
