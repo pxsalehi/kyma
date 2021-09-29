@@ -49,6 +49,7 @@ type benchCmd struct {
 	replicas      int
 	purge         bool
 	maxAckPending int
+	publishInterval int
 }
 
 const (
@@ -78,6 +79,7 @@ func configureBenchCommand(app *kingpin.Application) {
 	bench.Flag("replicas", "Number of stream replicas").Default("1").IntVar(&c.replicas)
 	bench.Flag("purge", "Purge the stream before running").Default("false").BoolVar(&c.purge)
 	bench.Flag("maxackpending", "Max acks pending for JS consumer").Default("-1").IntVar(&c.maxAckPending)
+	bench.Flag("publishInterval", "Time to wait (ms) between publishing two messages").Default("0").IntVar(&c.publishInterval)
 
 	cheats["bench"] = `# benchmark core nats publish and subscribe with 10 publishers and subscribers
 nats bench testsubject --pub 10 --sub 10 --msgs 10000 --size 512
@@ -339,6 +341,7 @@ func jsPublisher(c benchCmd, nc *nats.Conn, progress *uiprogress.Bar, msg []byte
 	}
 
 	if !c.syncPub {
+		d := time.Duration(c.publishInterval) * time.Millisecond
 		for i := 0; i < numMsg; i += c.pubBatch {
 			state = "Publishing"
 			for j := 0; j < c.pubBatch && i+j < c.numMsg; j++ {
@@ -349,6 +352,7 @@ func jsPublisher(c benchCmd, nc *nats.Conn, progress *uiprogress.Bar, msg []byte
 				if progress != nil {
 					progress.Incr()
 				}
+				time.Sleep(d)
 			}
 
 			state = "AckWait   "
