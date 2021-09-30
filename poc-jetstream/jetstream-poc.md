@@ -4,16 +4,35 @@ What are the minimum change we need to have to keep our current NATS-based backe
 have at-least-once guarantees?
 
 - [F] Should we use Operator or Helm? How do we setup a cluster of size 1 or 3, that can use a PV?
-  
+  + NATS Operator officially discourages to use nats-operator for new deployments. Also support for JetStreams by nats-operator is questionable.
+    > The recommended way of running NATS on Kubernetes is by using the Helm charts. If looking for JetStream support, this is supported in the Helm charts. The NATS Operator is not recommended to be used for new deployments.
+([Reference](https://github.com/nats-io/nats-operator#nats-operator))
+  + Clustering needs to be enabled and defined in helm chart.
+  + Existing PVC can also be assigned for JetStream fileStorage as described [here](https://github.com/nats-io/k8s/tree/main/helm/charts/nats#using-with-an-existing-persistentvolumeclaim). But this needs to be explored further.
+
+- [F,P] Do we need [NACK](https://github.com/nats-io/nack#getting-started) for configuration of streams?
+  + NACK allows to manage JetStream streams and consumers using k8s CRDs.
+  + Using NACK is optional, instead we can use the NATS Go client for JetStream management.
+
+- [F,P] What is the current NATS workload works using Jetstream?
+  + The concept of streams and consumers is new in Jetstream.
+  + Streams basically provide a persistence for the events. 
+  + We need to create Stream, and assign subjects to this stream. Any event published to these subjects will be received and stored by the stream.
+
 - [F,P] How to configure streams and consumers?
   + Do we need one consumer per subscription?
+    - We need atleast one consumer per subscription.
   + Do we need one stream for the whole backend, or one stream per topic?
     - How does the retention policy set on a stream apply to the subjects in it? There is a per-subject message limit.
   
 - [F] What changes are required in our NATS-based reconciler/dispatcher to use the JetStream backend?
   + How many consumers do we need? One per subscription? 
+    - We need atleast one consumer per subscription.
   + Pull or push-based? Push-based seems to be the closest to the current model we have with NATS.
     - Push-based would add matching publications of a consumer to a separate subj.
+  + The workflow for defining Streams for subscriptions needs to be implemented.
+  + The subscribers creation part (or dispatcher) needs to be replaced by JetStream context-based subscribers/consumers.
+  + The publisher-proxy also needs to be updated to use JetStream context-based publisher.
   
 - [F,P] How to migrate a cluster from a NATS-based to a JetStream-based backend, and how would that impact existing subscriptions? 
   + Considering we have no persistent messages in NATS, if we switch during a maintenance window when there are no new
