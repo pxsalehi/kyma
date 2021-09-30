@@ -787,6 +787,60 @@ Re-run the replicated vs not-replicated scenario with async publishers.
 Avg pub msg/sec: 439 -> 
 Avg sub msg/sec: ~900
 
+With 1 million:
+```
+pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
+pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
+pods["pod3"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app3.bench3.subj.v1"
+pods["pod4"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app4.bench1.subj.v1"
+pods["pod5"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app5.bench2.subj.v1"
+pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app6.bench3.subj.v1"
+```
+```
+*****Pod1*****
+--- PUB ---
+  [2] 326 msgs/sec ~ 163.05 KB/sec (500000 msgs)
+  min 326 | avg 326 | max 326 | stddev 0 msgs
+--- SUB ---
+  [10] 652 msgs/sec ~ 326.12 KB/sec (1000000 msgs)
+  min 652 | avg 652 | max 652 | stddev 0 msgs
+*****Pod2*****
+--- PUB ---
+  [2] 326 msgs/sec ~ 163.03 KB/sec (500000 msgs)
+  min 326 | avg 335 | max 344 | stddev 9 msgs
+--- SUB ---
+  [10] 652 msgs/sec ~ 326.06 KB/sec (1000000 msgs)
+  min 652 | avg 652 | max 652 | stddev 0 msgs
+*****Pod3*****
+--- PUB ---
+  [2] 325 msgs/sec ~ 162.77 KB/sec (500000 msgs)
+  min 325 | avg 325 | max 325 | stddev 0 msgs
+--- SUB ---
+  [10] 651 msgs/sec ~ 325.58 KB/sec (1000000 msgs)
+  min 651 | avg 651 | max 651 | stddev 0 msgs
+*****Pod4*****
+--- PUB ---
+  [2] 327 msgs/sec ~ 163.85 KB/sec (500000 msgs)
+  min 327 | avg 332 | max 338 | stddev 5 msgs
+--- SUB ---
+  [10] 655 msgs/sec ~ 327.72 KB/sec (1000000 msgs)
+  min 655 | avg 655 | max 655 | stddev 0 msgs
+*****Pod5*****
+--- PUB ---
+  [2] 338 msgs/sec ~ 169.16 KB/sec (500000 msgs)
+  min 338 | avg 339 | max 340 | stddev 1 msgs
+--- SUB ---
+  [10] 676 msgs/sec ~ 338.35 KB/sec (1000000 msgs)
+  min 676 | avg 676 | max 676 | stddev 0 msgs
+*****Pod6*****
+--- PUB ---
+  [2] 337 msgs/sec ~ 168.92 KB/sec (500000 msgs)
+  min 337 | avg 337 | max 338 | stddev 0 msgs
+--- SUB ---
+  [10] 675 msgs/sec ~ 337.85 KB/sec (1000000 msgs)
+  min 675 | avg 675 | max 675 | stddev 0 msgs
+```
+
 **Replication=3 + async pub**
 Avg pub msg/sec: 559
 Avg sub msg/sec: 
