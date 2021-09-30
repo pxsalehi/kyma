@@ -58,9 +58,14 @@ Storage requirement seems to be not more than `num-of-msgs * replication-factor 
 
 #### Performance
 
-**Publish to the same stream (3 pods)**
-Avg pub msg/sec: 177
-Avg sub msg/sec: ~340
+**Publish to the same stream**
+
+<details><summary>3 Pods, 10k pub per Pod, msg size 10k</summary>
+
+- Avg pub msg/sec: 177
+- Avg sub msg/sec: ~340
+
+<details><summary>Per pod commands and results</summary>
 
 Stream must be created beforehand to set the list of subjects to `STREAM.>`: 
 ```
@@ -106,6 +111,9 @@ NATS Pub/Sub stats: 3,499 msgs/sec ~ 34.18 MB/sec
   [10] 318 msgs/sec ~ 3.11 MB/sec (10000 msgs)
   min 318 | avg 318 | max 318 | stddev 0 msgs
 ```
+
+</details>
+</details>
 
 **Using async publishing (publish call returns a Promise)**
 ```
@@ -434,11 +442,19 @@ NATS Pub/Sub stats: 4,337 msgs/sec ~ 42.36 MB/sec
 
 Average pub msg/sec went from 210 to 173.
 
-##### Memory vs file-based
+
+---
+
+### Memory vs file-based
+
+6 x (2 publishers and 10 subscribers), 10k messages each 1KB, 3 replicas, Sync publishers, 1 stream 
 
 **In-memory**
-Avg pub msg/sec: 197
-Avg sub msg/sec: ~360
+
+- Avg pub msg/sec: 197
+- Avg sub msg/sec: ~360
+
+<details><summary>Commands and results</summary>
 
 Create the stream:
 `nats str add --subjects='default.>' --replicas=3 --storage=memory default`
@@ -518,10 +534,14 @@ NATS Pub/Sub stats: 3,632 msgs/sec ~ 3.55 MB/sec
   [10] 330 msgs/sec ~ 330.28 KB/sec (10000 msgs)
   min 330 | avg 330 | max 330 | stddev 0 msgs
 ```
+</details>
 
 **File-based**
-Avg pub msg/sec: 164
-Avg sub msg/sec: ~330
+
+- Avg pub msg/sec: 164
+- Avg sub msg/sec: ~330
+
+<details><summary>Commands and results</summary>
 
 Create the stream:
 `nats str add --subjects='default.>' --replicas=3 --storage=file default`
@@ -604,11 +624,20 @@ NATS Pub/Sub stats: 3,194 msgs/sec ~ 3.12 MB/sec
   min 290 | avg 290 | max 290 | stddev 0 msgs
 ```
 
-##### Replication
+</details>
+
+---
+
+### Replication
+
+6 x (2 publishers and 10 subscribers), 10k messages each 1KB, file-based, Sync publishers, 1 stream
 
 **No replication**
-Avg pub msg/sec: 173
-Avg sub msg/sec: ~320
+
+- Avg pub msg/sec: 173
+- Avg sub msg/sec: ~320
+
+<details><summary>Commands and results</summary>
 
 Create the stream:
 `nats str add --subjects='default.>' --replicas=1 --storage=file default`
@@ -691,9 +720,12 @@ NATS Pub/Sub stats: 3,293 msgs/sec ~ 3.22 MB/sec
   min 299 | avg 299 | max 299 | stddev 0 msgs
 ```
 
+</details>
+
 **Replication = 3**
-Avg pub msg/sec: 164
-Avg sub msg/sec: ~330
+
+- Avg pub msg/sec: 164
+- Avg sub msg/sec: ~330
 
 Create the stream:
 `nats str add --subjects='default.>' --replicas=3 --storage=file default`
@@ -778,16 +810,15 @@ NATS Pub/Sub stats: 3,194 msgs/sec ~ 3.12 MB/sec
 
 
 **Some conclusions**
-It could be that all the results are throttled due to the synchronous publishers.
+It could be that all the results are throttled due to the synchronous publishers. -> Nope!
 
-**TODO**
 Re-run the replicated vs not-replicated scenario with async publishers.
+With 1 million publications per pod.
 
 **No replication + async pub**
-Avg pub msg/sec: 439 -> 
-Avg sub msg/sec: ~900
+Avg pub msg/sec: 332 
+Avg sub msg/sec:
 
-With 1 million:
 ```
 pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
 pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
@@ -842,8 +873,60 @@ pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000
 ```
 
 **Replication=3 + async pub**
-Avg pub msg/sec: 559
+Avg pub msg/sec: 408
 Avg sub msg/sec: 
+```
+pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
+pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
+pods["pod3"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app3.bench3.subj.v1"
+pods["pod4"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app4.bench1.subj.v1"
+pods["pod5"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app5.bench2.subj.v1"
+pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app6.bench3.subj.v1"
+```
+```
+*****Pod1*****
+--- PUB ---
+  [2] 399 msgs/sec ~ 199.89 KB/sec (500000 msgs)
+  min 399 | avg 399 | max 399 | stddev 0 msgs
+--- SUB ---
+  [10] 799 msgs/sec ~ 399.77 KB/sec (1000000 msgs)
+  min 799 | avg 799 | max 799 | stddev 0 msgs
+*****Pod2*****
+--- PUB ---
+  [2] 401 msgs/sec ~ 200.91 KB/sec (500000 msgs)
+  min 401 | avg 412 | max 423 | stddev 11 msgs
+--- SUB ---
+  [10] 803 msgs/sec ~ 401.83 KB/sec (1000000 msgs)
+  min 803 | avg 803 | max 803 | stddev 0 msgs
+*****Pod3*****
+--- PUB ---
+  [2] 418 msgs/sec ~ 209.15 KB/sec (500000 msgs)
+  min 418 | avg 418 | max 418 | stddev 0 msgs
+--- SUB ---
+  [10] 836 msgs/sec ~ 418.38 KB/sec (1000000 msgs)
+  min 836 | avg 836 | max 836 | stddev 0 msgs
+*****Pod4*****
+--- PUB ---
+  [2] 400 msgs/sec ~ 200.21 KB/sec (500000 msgs)
+  min 400 | avg 410 | max 420 | stddev 10 msgs
+--- SUB ---
+  [10] 800 msgs/sec ~ 400.47 KB/sec (1000000 msgs)
+  min 800 | avg 800 | max 800 | stddev 0 msgs
+*****Pod5*****
+--- PUB ---
+  [2] 401 msgs/sec ~ 200.72 KB/sec (500000 msgs)
+  min 401 | avg 410 | max 420 | stddev 9 msgs
+--- SUB ---
+  [10] 802 msgs/sec ~ 401.45 KB/sec (1000000 msgs)
+  min 802 | avg 802 | max 802 | stddev 0 msgs
+*****Pod6*****
+--- PUB ---
+  [2] 400 msgs/sec ~ 200.21 KB/sec (500000 msgs)
+  min 400 | avg 402 | max 404 | stddev 2 msgs
+--- SUB ---
+  [10] 800 msgs/sec ~ 400.46 KB/sec (1000000 msgs)
+  min 800 | avg 800 | max 800 | stddev 0 msgs
+```
 
 ### Phase 2
 
