@@ -1,4 +1,4 @@
-# Phase 1 
+## Phase 1 
 
 What are the minimum change we need to have to keep our current NATS-based backend but move to JetStream to be able to 
 have at-least-once guarantees?
@@ -1053,7 +1053,7 @@ pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000
 
 ---
 
-### Phase 2
+## Phase 2
 
 When moving to JetStream, what extra features/options can we provide as part of the NATS-based backend?
 
