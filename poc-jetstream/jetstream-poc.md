@@ -1,4 +1,4 @@
-### Phase 1 
+# Phase 1 
 
 What are the minimum change we need to have to keep our current NATS-based backend but move to JetStream to be able to 
 have at-least-once guarantees?
@@ -22,8 +22,15 @@ have at-least-once guarantees?
 - [F,P] How to configure streams and consumers?
   + Do we need one consumer per subscription?
     - We need atleast one consumer per subscription.
-  + Do we need one stream for the whole backend, or one stream per topic?
-    - How does the retention policy set on a stream apply to the subjects in it? There is a per-subject message limit.
+  + Do we need one stream for the whole backend, or multiple streams? A stream has its own configs 
+    such as: storage, replicas, retention, deduplication. Each subject can only be in one stream. 
+    We have two option:
+    - Use one stream for all event types, which means one stream uses a wild-card (`>`) to match all
+      event types. The issue is that the previous wild-card also matches internal JetStream events
+      which can end up taking up space. The solution is to use the stream name as a prefix.
+      + It is still possible to set one retention limit that applies independently to each event type.
+      + If we do not need to have these configs customizable per event type, no need to use multiple streams.
+    - Use one stream for each `app.*.*.*`. We would need to dynamically create the stream for each event type.
   
 - [F] What changes are required in our NATS-based reconciler/dispatcher to use the JetStream backend?
   + How many consumers do we need? One per subscription? 
@@ -48,43 +55,51 @@ have at-least-once guarantees?
   + Question: Is it a deal-breaker to not use encryption by default?
   
 - [P] Benchmark/estimate:
-  + [X] Cluster stability in the long run
-  + [X] Possible variations are:
+  + Cluster stability in the long run
+  + Performance:
     + **One stream for all** and 1 stream per `app.*.*.*`
     + Memory- and **file-based** streams
     + Replication (cluster size 1 or **cluster size 3**)
-    + Metrics
-      + Storage size requirement
-      + Performance of publishing and subscribing in terms of throughput and latency
-    
-#### Cluster stability in the long run
-- 3 servers 
-- 3 x (2 publishers and 10 subscribers publishing/subscribing to one subj/stream)
+  
+## Benchmarks
+
+- Gardener Cluster with 3 Nodes each 4 CPU and 15Gi Memory
+- Each NATS server has 1 CPU and 2 Gi Memory
 - Ordered push-based consumers
-- Replication=3, file-based
+
+---
+
+### Cluster stability in the long run
+
+- 3 x (2 publishers and 10 subscribers), 3 streams, 3 replicas, file-based
 - Around 12 hours
+
+<details><summary>Commands and results</summary>
+
 ```
 pods["pod1"]="./natscli bench --stream=bench1 --pub=2 --sub=10 --js --msgs=8640 --replicas=3 --size=10240 --storage=file --publishInterval=5000 bench-subj-1"
 pods["pod2"]="./natscli bench --stream=bench2 --pub=2 --sub=10 --js --msgs=8640 --replicas=3 --size=10240 --storage=file --publishInterval=5000 bench-subj-2"
 pods["pod3"]="./natscli bench --stream=bench3 --pub=2 --sub=10 --js --msgs=8640 --replicas=3 --size=10240 --storage=file --publishInterval=5000 bench-subj-3"
 ```
 
-Objective: to check if the consensus/replication in a cluster is stable in a long period of eventing activity.
+</details>
 
-Did not see any server crash or consensus problem.
+- Objective was to check if the consensus/replication in a cluster is stable in a long period of eventing activity.
+- Did not see any server crash or consensus problem.
+- Storage requirement seems to be not more than `num-of-msgs * replication-factor * msg-size`
 
-Storage requirement seems to be not more than `num-of-msgs * replication-factor * msg-size`
+---
 
-#### Performance
+### One stream for all vs one stream per `app.*.*.*`
 
 **Publish to the same stream**
 
-<details><summary>3 Pods, 10k pub per Pod, msg size 10k</summary>
+<details><summary>3 x (2 publishers and 10 subscribers), 10k messages each 10KB, 3 replicas, Sync publishers, file-based</summary>
 
 - Avg pub msg/sec: 177
 - Avg sub msg/sec: ~340
 
-<details><summary>Per pod commands and results</summary>
+<details><summary>Commands and results</summary>
 
 Stream must be created beforehand to set the list of subjects to `STREAM.>`: 
 ```
@@ -134,7 +149,13 @@ NATS Pub/Sub stats: 3,499 msgs/sec ~ 34.18 MB/sec
 </details>
 </details>
 
-**Using async publishing (publish call returns a Promise)**
+<details><summary>3 x (2 publishers and 10 subscribers), 10k messages each 10KB, 3 replicas, Async publishers, file-based</summary>
+
+- Avg pub msg/sec: 628
+- Avg sub msg/sec: 
+
+<details><summary>Commands and results</summary>
+
 ```
 pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --no-progress --storage=file default.app1.bench1.subj.v1"
 pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --no-progress --storage=file default.app2.bench2.subj.v1"
@@ -149,14 +170,6 @@ NATS Pub/Sub stats: 8,853 msgs/sec ~ 86.46 MB/sec
   min 489 | avg 540 | max 592 | stddev 51 msgs
  Sub stats: 8,058 msgs/sec ~ 78.70 MB/sec
   [1] 979 msgs/sec ~ 9.57 MB/sec (10000 msgs)
-  [2] 978 msgs/sec ~ 9.56 MB/sec (10000 msgs)
-  [3] 976 msgs/sec ~ 9.54 MB/sec (10000 msgs)
-  [4] 972 msgs/sec ~ 9.50 MB/sec (10000 msgs)
-  [5] 972 msgs/sec ~ 9.50 MB/sec (10000 msgs)
-  [6] 971 msgs/sec ~ 9.49 MB/sec (10000 msgs)
-  [7] 971 msgs/sec ~ 9.49 MB/sec (10000 msgs)
-  [8] 817 msgs/sec ~ 7.98 MB/sec (10000 msgs)
-  [9] 807 msgs/sec ~ 7.89 MB/sec (10000 msgs)
   [10] 806 msgs/sec ~ 7.88 MB/sec (10000 msgs)
   min 806 | avg 924 | max 979 | stddev 75 msgs
 ```
@@ -168,14 +181,6 @@ NATS Pub/Sub stats: 8,704 msgs/sec ~ 85.00 MB/sec
   min 564 | avg 573 | max 583 | stddev 9 msgs
  Sub stats: 7,914 msgs/sec ~ 77.29 MB/sec
   [1] 1,130 msgs/sec ~ 11.04 MB/sec (10000 msgs)
-  [2] 1,130 msgs/sec ~ 11.04 MB/sec (10000 msgs)
-  [3] 1,128 msgs/sec ~ 11.02 MB/sec (10000 msgs)
-  [4] 1,128 msgs/sec ~ 11.02 MB/sec (10000 msgs)
-  [5] 1,080 msgs/sec ~ 10.55 MB/sec (10000 msgs)
-  [6] 1,069 msgs/sec ~ 10.44 MB/sec (10000 msgs)
-  [7] 837 msgs/sec ~ 8.18 MB/sec (10000 msgs)
-  [8] 814 msgs/sec ~ 7.96 MB/sec (10000 msgs)
-  [9] 809 msgs/sec ~ 7.91 MB/sec (10000 msgs)
   [10] 791 msgs/sec ~ 7.73 MB/sec (10000 msgs)
   min 791 | avg 991 | max 1,130 | stddev 147 msgs
 ```
@@ -187,20 +192,18 @@ NATS Pub/Sub stats: 15,027 msgs/sec ~ 146.76 MB/sec
   min 707 | avg 771 | max 835 | stddev 64 msgs
  Sub stats: 13,843 msgs/sec ~ 135.19 MB/sec
   [1] 1,460 msgs/sec ~ 14.26 MB/sec (10000 msgs)
-  [2] 1,444 msgs/sec ~ 14.10 MB/sec (10000 msgs)
-  [3] 1,434 msgs/sec ~ 14.01 MB/sec (10000 msgs)
-  [4] 1,433 msgs/sec ~ 14.00 MB/sec (10000 msgs)
-  [5] 1,432 msgs/sec ~ 13.99 MB/sec (10000 msgs)
-  [6] 1,493 msgs/sec ~ 14.59 MB/sec (10000 msgs)
-  [7] 1,493 msgs/sec ~ 14.58 MB/sec (10000 msgs)
-  [8] 1,493 msgs/sec ~ 14.58 MB/sec (10000 msgs)
-  [9] 1,443 msgs/sec ~ 14.10 MB/sec (10000 msgs)
   [10] 1,442 msgs/sec ~ 14.09 MB/sec (10000 msgs)
   min 1,432 | avg 1,456 | max 1,493 | stddev 24 msgs
 ```
+</details>
+</details>
 
-**Using async publish with message size 1k**
-Compared to message size 10k, it gets better!
+<details><summary>3 x (2 publishers and 10 subscribers), 10k messages each 1KB, 3 replicas, Async publishers, file-based</summary>
+
+- Avg pub msg/sec: 1810
+- Avg sub msg/sec:
+
+<details><summary>Commands and results</summary>
 
 ```
 NATS Pub/Sub stats: 35,289 msgs/sec ~ 34.46 MB/sec
@@ -210,14 +213,6 @@ NATS Pub/Sub stats: 35,289 msgs/sec ~ 34.46 MB/sec
   min 1,662 | avg 1,869 | max 2,077 | stddev 207 msgs
  Sub stats: 32,149 msgs/sec ~ 31.40 MB/sec
   [1] 3,331 msgs/sec ~ 3.25 MB/sec (10000 msgs)
-  [2] 3,330 msgs/sec ~ 3.25 MB/sec (10000 msgs)
-  [3] 3,332 msgs/sec ~ 3.25 MB/sec (10000 msgs)
-  [4] 3,328 msgs/sec ~ 3.25 MB/sec (10000 msgs)
-  [5] 3,333 msgs/sec ~ 3.26 MB/sec (10000 msgs)
-  [6] 3,220 msgs/sec ~ 3.15 MB/sec (10000 msgs)
-  [7] 3,219 msgs/sec ~ 3.14 MB/sec (10000 msgs)
-  [8] 3,219 msgs/sec ~ 3.14 MB/sec (10000 msgs)
-  [9] 3,219 msgs/sec ~ 3.14 MB/sec (10000 msgs)
   [10] 3,218 msgs/sec ~ 3.14 MB/sec (10000 msgs)
   min 3,218 | avg 3,274 | max 3,333 | stddev 55 msgs
 ```
@@ -229,14 +224,6 @@ NATS Pub/Sub stats: 35,610 msgs/sec ~ 34.78 MB/sec
   min 1,804 | avg 1,804 | max 1,805 | stddev 0 msgs
  Sub stats: 32,399 msgs/sec ~ 31.64 MB/sec
   [1] 3,616 msgs/sec ~ 3.53 MB/sec (10000 msgs)
-  [2] 3,357 msgs/sec ~ 3.28 MB/sec (10000 msgs)
-  [3] 3,355 msgs/sec ~ 3.28 MB/sec (10000 msgs)
-  [4] 3,352 msgs/sec ~ 3.27 MB/sec (10000 msgs)
-  [5] 3,345 msgs/sec ~ 3.27 MB/sec (10000 msgs)
-  [6] 3,249 msgs/sec ~ 3.17 MB/sec (10000 msgs)
-  [7] 3,247 msgs/sec ~ 3.17 MB/sec (10000 msgs)
-  [8] 3,246 msgs/sec ~ 3.17 MB/sec (10000 msgs)
-  [9] 3,240 msgs/sec ~ 3.16 MB/sec (10000 msgs)
   [10] 3,240 msgs/sec ~ 3.16 MB/sec (10000 msgs)
   min 3,240 | avg 3,324 | max 3,616 | stddev 109 msgs
 ```
@@ -248,72 +235,18 @@ NATS Pub/Sub stats: 37,846 msgs/sec ~ 36.96 MB/sec
   **min 1,722 | avg 1,758 | max 1,795 | stddev 36 msgs**
  Sub stats: 35,486 msgs/sec ~ 34.65 MB/sec
   [1] 3,550 msgs/sec ~ 3.47 MB/sec (10000 msgs)
-  [2] 3,667 msgs/sec ~ 3.58 MB/sec (10000 msgs)
-  [3] 3,668 msgs/sec ~ 3.58 MB/sec (10000 msgs)
-  [4] 3,551 msgs/sec ~ 3.47 MB/sec (10000 msgs)
-  [5] 3,569 msgs/sec ~ 3.49 MB/sec (10000 msgs)
-  [6] 3,551 msgs/sec ~ 3.47 MB/sec (10000 msgs)
-  [7] 3,569 msgs/sec ~ 3.49 MB/sec (10000 msgs)
-  [8] 3,664 msgs/sec ~ 3.58 MB/sec (10000 msgs)
-  [9] 3,664 msgs/sec ~ 3.58 MB/sec (10000 msgs)
   [10] 3,670 msgs/sec ~ 3.58 MB/sec (10000 msgs)
   min 3,550 | avg 3,612 | max 3,670 | stddev 54 msgs
 ```
+</details>
+</details>
 
-**Publish to subjects each having their own stream (3 pods)**
-Avg pub msg/sec: 210
-Avg sub msg/sec: ~360
+<details><summary>6 x (2 publishers and 10 subscribers), 10k messages each 10KB, 3 replicas, Sync publishers, file-based</summary>
 
-Create the three streams beforehand: app1, app2, app3, e.g.:
-`nats str add --subjects='app1.>' --replicas=3 --storage=file app1`
+- Avg pub msg/sec: 97
+- Avg sub msg/sec: ~175
 
-```
-pods["pod1"]="./natscli bench --stream=app1 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app1.bench1.subj.v1"
-pods["pod2"]="./natscli bench --stream=app2 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app2.bench2.subj.v1"
-pods["pod3"]="./natscli bench --stream=app3 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app3.bench3.subj.v1"
-```
-
-```
-NATS Pub/Sub stats: 4,309 msgs/sec ~ 42.09 MB/sec
- Pub stats: 391 msgs/sec ~ 3.83 MB/sec
-  [1] 280 msgs/sec ~ 2.74 MB/sec (5000 msgs)
-  [2] 195 msgs/sec ~ 1.91 MB/sec (5000 msgs)
-  min 195 | avg 237 | max 280 | stddev 42 msgs
- Sub stats: 3,918 msgs/sec ~ 38.26 MB/sec
-  [1] 391 msgs/sec ~ 3.83 MB/sec (10000 msgs)
-  [10] 391 msgs/sec ~ 3.83 MB/sec (10000 msgs)
-  min 391 | avg 391 | max 391 | stddev 0 msgs
-```
-```
-NATS Pub/Sub stats: 3,756 msgs/sec ~ 36.68 MB/sec
- Pub stats: 341 msgs/sec ~ 3.33 MB/sec
-  [1] 231 msgs/sec ~ 2.26 MB/sec (5000 msgs)
-  [2] 170 msgs/sec ~ 1.67 MB/sec (5000 msgs)
-  min 170 | avg 200 | max 231 | stddev 30 msgs
- Sub stats: 3,415 msgs/sec ~ 33.35 MB/sec
-  [1] 341 msgs/sec ~ 3.34 MB/sec (10000 msgs)
-  [10] 341 msgs/sec ~ 3.34 MB/sec (10000 msgs)
-  min 341 | avg 341 | max 341 | stddev 0 msgs
-```
-```
-NATS Pub/Sub stats: 3,969 msgs/sec ~ 38.76 MB/sec
- Pub stats: 360 msgs/sec ~ 3.52 MB/sec
-  [1] 211 msgs/sec ~ 2.07 MB/sec (5000 msgs)
-  [2] 180 msgs/sec ~ 1.76 MB/sec (5000 msgs)
-  min 180 | avg 195 | max 211 | stddev 15 msgs
- Sub stats: 3,608 msgs/sec ~ 35.24 MB/sec
-  [1] 360 msgs/sec ~ 3.52 MB/sec (10000 msgs)
-  [10] 360 msgs/sec ~ 3.52 MB/sec (10000 msgs)
-  min 360 | avg 360 | max 360 | stddev 0 msgs
-```
-
-It seems sharing the same stream reduces the throughput of publishers. It went from 210 to 177 msg/sec. 
-
-**To check, let's increase the number of pods**
-
-Using the same stream (6 pods):
- Avg pub msg/sec: 97
- Avg sub msg/sec: ~175
+<details><summary>Commands and results</summary>
 
 ```
 pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file default.app1.bench1.subj.v1"
@@ -379,11 +312,134 @@ NATS Pub/Sub stats: 2,083 msgs/sec ~ 20.34 MB/sec
   min 189 | avg 189 | max 189 | stddev 0 msgs
 ```
 
-Average publication per second (using same stream but increasing pods) goes down from 177 to 97!
+</details>
+</details>
 
-Using one stream per app (6 pods):
- Avg pub msg/sec: 173
- Avg sub msg/sec: ~350
+<details><summary>6 x (2 publishers and 10 subscribers), 1M messages each 512B, 3 replicas, Async publishers, file-based</summary>
+
+- Avg pub msg/sec: 387
+- Avg sub msg/sec:
+
+<details><summary>Commands and results</summary>
+
+```
+pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app1.bench1.subj.v1"
+pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app2.bench2.subj.v1"
+pods["pod3"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app3.bench3.subj.v1"
+pods["pod4"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app4.bench1.subj.v1"
+pods["pod5"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app5.bench2.subj.v1"
+pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512  --no-progress --storage=file default.app6.bench3.subj.v1"
+```
+```
+*****Pod1*****
+--- PUB ---
+  [2] 393 msgs/sec ~ 196.92 KB/sec (500000 msgs)
+  min 393 | avg 393 | max 393 | stddev 0 msgs
+--- SUB ---
+  [10] 787 msgs/sec ~ 393.83 KB/sec (1000000 msgs)
+  min 787 | avg 787 | max 787 | stddev 0 msgs
+*****Pod2*****
+--- PUB ---
+  [2] 382 msgs/sec ~ 191.12 KB/sec (500000 msgs)
+  min 382 | avg 382 | max 382 | stddev 0 msgs
+--- SUB ---
+  [10] 764 msgs/sec ~ 382.25 KB/sec (1000000 msgs)
+  min 764 | avg 764 | max 764 | stddev 0 msgs
+*****Pod3*****
+--- PUB ---
+  [2] 392 msgs/sec ~ 196.37 KB/sec (500000 msgs)
+  min 392 | avg 392 | max 393 | stddev 0 msgs
+--- SUB ---
+  [10] 785 msgs/sec ~ 392.77 KB/sec (1000000 msgs)
+  min 785 | avg 785 | max 785 | stddev 0 msgs
+*****Pod4*****
+--- PUB ---
+  [2] 382 msgs/sec ~ 191.47 KB/sec (500000 msgs)
+  min 382 | avg 387 | max 392 | stddev 5 msgs
+--- SUB ---
+  [10] 765 msgs/sec ~ 382.94 KB/sec (1000000 msgs)
+  min 765 | avg 765 | max 765 | stddev 0 msgs
+*****Pod5*****
+--- PUB ---
+  [2] 382 msgs/sec ~ 191.27 KB/sec (500000 msgs)
+  min 382 | avg 387 | max 393 | stddev 5 msgs
+--- SUB ---
+  [10] 765 msgs/sec ~ 382.54 KB/sec (1000000 msgs)
+  min 765 | avg 765 | max 765 | stddev 0 msgs
+*****Pod6*****
+--- PUB ---
+  [2] 382 msgs/sec ~ 191.32 KB/sec (500000 msgs)
+  min 382 | avg 382 | max 382 | stddev 0 msgs
+--- SUB ---
+  [10] 765 msgs/sec ~ 382.67 KB/sec (1000000 msgs)
+  min 765 | avg 765 | max 765 | stddev 0 msgs
+```
+
+</details>
+
+</details>
+
+**Publish to one stream per `app.*.*.*`**
+
+<details><summary>3 x (2 publishers and 10 subscribers), 10k messages each 10KB, 3 replicas, Sync publishers</summary>
+
+- Avg pub msg/sec: 210
+- Avg sub msg/sec: ~360
+
+<details><summary>Commands and results</summary>
+
+Create the three streams beforehand: app1, app2, app3, e.g.:
+`nats str add --subjects='app1.>' --replicas=3 --storage=file app1`
+
+```
+pods["pod1"]="./natscli bench --stream=app1 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app1.bench1.subj.v1"
+pods["pod2"]="./natscli bench --stream=app2 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app2.bench2.subj.v1"
+pods["pod3"]="./natscli bench --stream=app3 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app3.bench3.subj.v1"
+```
+
+```
+NATS Pub/Sub stats: 4,309 msgs/sec ~ 42.09 MB/sec
+ Pub stats: 391 msgs/sec ~ 3.83 MB/sec
+  [1] 280 msgs/sec ~ 2.74 MB/sec (5000 msgs)
+  [2] 195 msgs/sec ~ 1.91 MB/sec (5000 msgs)
+  min 195 | avg 237 | max 280 | stddev 42 msgs
+ Sub stats: 3,918 msgs/sec ~ 38.26 MB/sec
+  [1] 391 msgs/sec ~ 3.83 MB/sec (10000 msgs)
+  [10] 391 msgs/sec ~ 3.83 MB/sec (10000 msgs)
+  min 391 | avg 391 | max 391 | stddev 0 msgs
+```
+```
+NATS Pub/Sub stats: 3,756 msgs/sec ~ 36.68 MB/sec
+ Pub stats: 341 msgs/sec ~ 3.33 MB/sec
+  [1] 231 msgs/sec ~ 2.26 MB/sec (5000 msgs)
+  [2] 170 msgs/sec ~ 1.67 MB/sec (5000 msgs)
+  min 170 | avg 200 | max 231 | stddev 30 msgs
+ Sub stats: 3,415 msgs/sec ~ 33.35 MB/sec
+  [1] 341 msgs/sec ~ 3.34 MB/sec (10000 msgs)
+  [10] 341 msgs/sec ~ 3.34 MB/sec (10000 msgs)
+  min 341 | avg 341 | max 341 | stddev 0 msgs
+```
+```
+NATS Pub/Sub stats: 3,969 msgs/sec ~ 38.76 MB/sec
+ Pub stats: 360 msgs/sec ~ 3.52 MB/sec
+  [1] 211 msgs/sec ~ 2.07 MB/sec (5000 msgs)
+  [2] 180 msgs/sec ~ 1.76 MB/sec (5000 msgs)
+  min 180 | avg 195 | max 211 | stddev 15 msgs
+ Sub stats: 3,608 msgs/sec ~ 35.24 MB/sec
+  [1] 360 msgs/sec ~ 3.52 MB/sec (10000 msgs)
+  [10] 360 msgs/sec ~ 3.52 MB/sec (10000 msgs)
+  min 360 | avg 360 | max 360 | stddev 0 msgs
+```
+
+</details>
+</details>
+
+<details><summary>6 x (2 publishers and 10 subscribers), 10k messages each 10KB, 3 replicas, Sync publishers, file-based</summary>
+
+- Avg pub msg/sec: 173
+- Avg sub msg/sec: ~350
+
+<details><summary>Commands and results</summary>
 
 ```
 pods["pod1"]="./natscli bench --stream=app1 --pub=2 --sub=10 --js --msgs=10000 --replicas=3 --size=10240 --syncpub --no-progress --storage=file app1.bench1.subj.v1"
@@ -459,14 +515,28 @@ NATS Pub/Sub stats: 4,337 msgs/sec ~ 42.36 MB/sec
   min 394 | avg 394 | max 394 | stddev 0 msgs
 ```
 
-Average pub msg/sec went from 210 to 173.
+</details>
+</details>
 
+---
+
+<details><summary>What could this mean?</summary>
+
+- It seems sharing the same stream reduces the throughput of publishers. When increasing the pods, 
+  sharing the stream seems to reduce performance more than using multiple streams.
+- We should aim for using async publishing in the publisher proxy.
+- Depending on what event rate we should provide, we might be able to get away with one Stream for all event types 
+  if we use async publishing.
+- Using only one stream simplifies the code in the publisher proxy.
+- We should agree on some realistic parameters (e.g. retention period, msg size) and re-run this evaluation.
+
+</details>
 
 ---
 
 ### Memory vs file-based
 
-6 x (2 publishers and 10 subscribers), 10k messages each 1KB, 3 replicas, Sync publishers, 1 stream 
+<details><summary>6 x (2 publishers and 10 subscribers), 10k messages each 1KB, 3 replicas, Sync publishers, 1 stream</summary> 
 
 **In-memory**
 
@@ -645,13 +715,24 @@ NATS Pub/Sub stats: 3,194 msgs/sec ~ 3.12 MB/sec
 
 </details>
 
+</details>
+
+---
+
+<details><summary>What could this mean?</summary>
+
+- File-based storage doesn't seem to be much slower than in-memory. Maybe due to the replication latency.
+- We'd any way probably use file-based!
+
+</details>
+
 ---
 
 ### Replication
 
-6 x (2 publishers and 10 subscribers), 10k messages each 1KB, file-based, Sync publishers, 1 stream
-
 **No replication**
+
+<details><summary>6 x (2 publishers and 10 subscribers), 10k messages each 1KB, file-based, Sync publishers, 1 stream</summary>
 
 - Avg pub msg/sec: 173
 - Avg sub msg/sec: ~320
@@ -740,11 +821,79 @@ NATS Pub/Sub stats: 3,293 msgs/sec ~ 3.22 MB/sec
 ```
 
 </details>
+</details>
+
+<details><summary>6 x (2 publishers and 10 subscribers), 1M messages each 512B, file-based, Async publishers, 1 stream</summary>
+
+- Avg pub msg/sec: 332
+- Avg sub msg/sec:
+
+<details><summary>Commands and results</summary>
+
+```
+pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
+pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
+pods["pod3"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app3.bench3.subj.v1"
+pods["pod4"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app4.bench1.subj.v1"
+pods["pod5"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app5.bench2.subj.v1"
+pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app6.bench3.subj.v1"
+```
+```
+*****Pod1*****
+--- PUB ---
+  [2] 326 msgs/sec ~ 163.05 KB/sec (500000 msgs)
+  min 326 | avg 326 | max 326 | stddev 0 msgs
+--- SUB ---
+  [10] 652 msgs/sec ~ 326.12 KB/sec (1000000 msgs)
+  min 652 | avg 652 | max 652 | stddev 0 msgs
+*****Pod2*****
+--- PUB ---
+  [2] 326 msgs/sec ~ 163.03 KB/sec (500000 msgs)
+  min 326 | avg 335 | max 344 | stddev 9 msgs
+--- SUB ---
+  [10] 652 msgs/sec ~ 326.06 KB/sec (1000000 msgs)
+  min 652 | avg 652 | max 652 | stddev 0 msgs
+*****Pod3*****
+--- PUB ---
+  [2] 325 msgs/sec ~ 162.77 KB/sec (500000 msgs)
+  min 325 | avg 325 | max 325 | stddev 0 msgs
+--- SUB ---
+  [10] 651 msgs/sec ~ 325.58 KB/sec (1000000 msgs)
+  min 651 | avg 651 | max 651 | stddev 0 msgs
+*****Pod4*****
+--- PUB ---
+  [2] 327 msgs/sec ~ 163.85 KB/sec (500000 msgs)
+  min 327 | avg 332 | max 338 | stddev 5 msgs
+--- SUB ---
+  [10] 655 msgs/sec ~ 327.72 KB/sec (1000000 msgs)
+  min 655 | avg 655 | max 655 | stddev 0 msgs
+*****Pod5*****
+--- PUB ---
+  [2] 338 msgs/sec ~ 169.16 KB/sec (500000 msgs)
+  min 338 | avg 339 | max 340 | stddev 1 msgs
+--- SUB ---
+  [10] 676 msgs/sec ~ 338.35 KB/sec (1000000 msgs)
+  min 676 | avg 676 | max 676 | stddev 0 msgs
+*****Pod6*****
+--- PUB ---
+  [2] 337 msgs/sec ~ 168.92 KB/sec (500000 msgs)
+  min 337 | avg 337 | max 338 | stddev 0 msgs
+--- SUB ---
+  [10] 675 msgs/sec ~ 337.85 KB/sec (1000000 msgs)
+  min 675 | avg 675 | max 675 | stddev 0 msgs
+```
+
+</details>
+</details>
 
 **Replication = 3**
 
+<details><summary>6 x (2 publishers and 10 subscribers), 10k messages each 1KB, file-based, Sync publishers, 1 stream</summary>
+
 - Avg pub msg/sec: 164
 - Avg sub msg/sec: ~330
+
+<details><summary>Commands and results</summary>
 
 Create the stream:
 `nats str add --subjects='default.>' --replicas=3 --storage=file default`
@@ -827,73 +976,16 @@ NATS Pub/Sub stats: 3,194 msgs/sec ~ 3.12 MB/sec
   min 290 | avg 290 | max 290 | stddev 0 msgs
 ```
 
+</details>
+</details>
 
-**Some conclusions**
-It could be that all the results are throttled due to the synchronous publishers. -> Nope!
+<details><summary>6 x (2 publishers and 10 subscribers), 1M messages each 512B, file-based, Async publishers, 1 stream</summary>
 
-Re-run the replicated vs not-replicated scenario with async publishers.
-With 1 million publications per pod.
+- Avg pub msg/sec: 408
+- Avg sub msg/sec:
 
-**No replication + async pub**
-Avg pub msg/sec: 332 
-Avg sub msg/sec:
+<details><summary>Commands and results</summary>
 
-```
-pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
-pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
-pods["pod3"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app3.bench3.subj.v1"
-pods["pod4"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app4.bench1.subj.v1"
-pods["pod5"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app5.bench2.subj.v1"
-pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=1 --size=512 --no-progress --storage=file default.app6.bench3.subj.v1"
-```
-```
-*****Pod1*****
---- PUB ---
-  [2] 326 msgs/sec ~ 163.05 KB/sec (500000 msgs)
-  min 326 | avg 326 | max 326 | stddev 0 msgs
---- SUB ---
-  [10] 652 msgs/sec ~ 326.12 KB/sec (1000000 msgs)
-  min 652 | avg 652 | max 652 | stddev 0 msgs
-*****Pod2*****
---- PUB ---
-  [2] 326 msgs/sec ~ 163.03 KB/sec (500000 msgs)
-  min 326 | avg 335 | max 344 | stddev 9 msgs
---- SUB ---
-  [10] 652 msgs/sec ~ 326.06 KB/sec (1000000 msgs)
-  min 652 | avg 652 | max 652 | stddev 0 msgs
-*****Pod3*****
---- PUB ---
-  [2] 325 msgs/sec ~ 162.77 KB/sec (500000 msgs)
-  min 325 | avg 325 | max 325 | stddev 0 msgs
---- SUB ---
-  [10] 651 msgs/sec ~ 325.58 KB/sec (1000000 msgs)
-  min 651 | avg 651 | max 651 | stddev 0 msgs
-*****Pod4*****
---- PUB ---
-  [2] 327 msgs/sec ~ 163.85 KB/sec (500000 msgs)
-  min 327 | avg 332 | max 338 | stddev 5 msgs
---- SUB ---
-  [10] 655 msgs/sec ~ 327.72 KB/sec (1000000 msgs)
-  min 655 | avg 655 | max 655 | stddev 0 msgs
-*****Pod5*****
---- PUB ---
-  [2] 338 msgs/sec ~ 169.16 KB/sec (500000 msgs)
-  min 338 | avg 339 | max 340 | stddev 1 msgs
---- SUB ---
-  [10] 676 msgs/sec ~ 338.35 KB/sec (1000000 msgs)
-  min 676 | avg 676 | max 676 | stddev 0 msgs
-*****Pod6*****
---- PUB ---
-  [2] 337 msgs/sec ~ 168.92 KB/sec (500000 msgs)
-  min 337 | avg 337 | max 338 | stddev 0 msgs
---- SUB ---
-  [10] 675 msgs/sec ~ 337.85 KB/sec (1000000 msgs)
-  min 675 | avg 675 | max 675 | stddev 0 msgs
-```
-
-**Replication=3 + async pub**
-Avg pub msg/sec: 408
-Avg sub msg/sec: 
 ```
 pods["pod1"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app1.bench1.subj.v1"
 pods["pod2"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000000 --replicas=3 --size=512 --no-progress --storage=file default.app2.bench2.subj.v1"
@@ -947,31 +1039,29 @@ pods["pod6"]="./natscli bench --stream=default --pub=2 --sub=10 --js --msgs=1000
   min 800 | avg 800 | max 800 | stddev 0 msgs
 ```
 
+</details>
+</details>
+
+---
+
+<details><summary>What could this mean?</summary>
+
+- Replication doesn't seem to have a huge impact on the throughput.
+- Results seem a bit unstable!
+
+</details>
+
+---
+
 ### Phase 2
 
 When moving to JetStream, what extra features/options can we provide as part of the NATS-based backend?
 
-- What kind of ack models should we support?
+- What kind of ack models should we support? 
 - Delivery policy: should we allow receiving messages form the start of the topic?
 - FlowControl: enforcing max-inflight (or max-ack-pending)
-- JS supports different accounts on the same cluster, to support multi-tenancy on the same JS cluster. Do we need this? Probably not!
-- Should we expose two different NATS-based "backends", one in-memory, and one file-based? Or if we create one Stream per
-  `app.*.*.*`, should we allow choosing per Stream?
-
-
-## Notes
-
-What is a stream and how many do we need? A stream is a collection of subjects, and has its own configs such 
-as: storage, replicas, retention, deduplication. Each subject can only be in one stream. Therefore, different stream
-configs can be set either for one stream which is used by all topics `>`, or for all topics of the same application `app.>`.
-
-**Configuring a JetStream cluster**
-- The replica count must be less than the maximum number of servers(!?) -> Do we need 4 servers for 3 replicas?
-- The replica count cannot be edited once configured.
-
-- Should we put all subjects in one stream?
-We could have one default stream which is persisted to file which uses following subjects:
-```
-DEFAULT.*.*.*.*, DEFAULT.*.*.*
-```
-Or we could have one stream per app as in `app.obj.verb.version`
+- JS supports different accounts on the same cluster, to support multi-tenancy on the same JS cluster. 
+  Do we need this? Probably not!
+- We might want to look into the KV store that JetStream offers, which might allow delegating 
+  state of our dispatchers (if we have any) to JetStream.
+  
