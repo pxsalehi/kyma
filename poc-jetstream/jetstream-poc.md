@@ -1064,4 +1064,6 @@ When moving to JetStream, what extra features/options can we provide as part of 
   Do we need this? Probably not!
 - We might want to look into the KV store that JetStream offers, which might allow delegating 
   state of our dispatchers (if we have any) to JetStream.
+- JetStream offers a deduplication feature (per window of time, e.g. 2m), which allows providing exactly-once 
+  delivery guarantee.
   
